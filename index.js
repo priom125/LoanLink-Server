@@ -29,16 +29,26 @@ async function run() {
     // Connect the client to the server
     const db = client.db("loanlink");
    const allLoan = db.collection("all-loan");
+   const loanCategory = db.collection("Loan-Category");
     
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
     
-    // Define routes AFTER connection
+    // Add a new loan
     app.post("/add-loan", async (req, res) => {
       try {
         const newLoan = req.body;
         const result = await allLoan.insertOne(newLoan);
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+    app.post("/add-loan-category", async (req, res) => {
+      try {
+        const newLoanCategory = req.body;
+        const result = await loanCategory.insertOne(newLoanCategory);
         res.send(result);
       } catch (error) {
         res.status(500).json({ message: error.message });
@@ -65,6 +75,16 @@ async function run() {
       } catch (error) {
         console.error("Error fetching favorite:", error);
         res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // Get loan categories by limit 
+    app.get("/loan-category", async (req, res) => {
+      try {
+        const categories = await loanCategory.find().limit(6).toArray();
+        res.json(categories) || [];
+      } catch (error) {
+        res.status(500).json({ message: error.message });
       }
     });
     app.get('/', (req, res) => {
