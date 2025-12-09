@@ -77,11 +77,43 @@ async function run() {
         res.status(500).json({ message: "Internal server error" });
       }
     });
+// get loan by id
+app.get("/loan/:id", async (req, res) => {
+  try {
+    const { ObjectId } = require('mongodb');
+    const id = req.params.id;
+    
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid loan ID" });
+    }
+    
+    const query = { _id: new ObjectId(id) };
+    const loan = await loanCategory.findOne(query);
+    
+    if (!loan) {
+      return res.status(404).json({ message: "Loan not found" });
+    }
+    
+    res.send(loan);
+  } catch (error) {
+    console.error("Error fetching loan:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
     // Get loan categories by limit 
     app.get("/loan-category", async (req, res) => {
       try {
         const categories = await loanCategory.find().limit(6).toArray();
+        res.json(categories) || [];
+      } catch (error) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+    // Get loan categories  
+    app.get("/all-loan-category", async (req, res) => {
+      try {
+        const categories = await loanCategory.find().toArray();
         res.json(categories) || [];
       } catch (error) {
         res.status(500).json({ message: error.message });
