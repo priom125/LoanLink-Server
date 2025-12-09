@@ -32,6 +32,19 @@ async function run() {
     const db = client.db("loanlink");
    const allLoan = db.collection("all-loan");
    const loanCategory = db.collection("Loan-Category");
+   const usersCollection = db.collection("users");
+
+
+   // Add login user data in users collection
+   app.post("/users", async (req, res) => {
+    try {
+      const user = req.body;
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
     
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
