@@ -126,10 +126,12 @@ async function run() {
 //get all loans
     app.get("/all-loan", async (req, res) => {
       try {
-        const loan = await allLoan.find().toArray();
-        res.json(loan) || [];
-        console.log(loan);
+        const email = req.query.email;
+        const filter = email ? { $or: [{ email }, { userEmail: email }] } : {};
+        const loan = await allLoan.find(filter).toArray();
+        res.json(loan);
       } catch (error) {
+        console.error("Error fetching loans:", error);
         res.status(500).json({ message: error.message });
       }
     });
@@ -161,18 +163,21 @@ async function run() {
       }
     });
 
-// get loan by email
- app.get("/my-loan", async (req, res) => {
-      try {
-        const userEmail = req.query.email;
-        const query = { email: userEmail };
-        const myLoan = await allLoan.find(query).toArray();
-        res.send(myLoan);
-      } catch (error) {
-        console.error("Error fetching favorite:", error);
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
+// get loan by email (specific user)
+app.get("/my-loan", async (req, res) => {
+  try {
+    const email = req.query.email;
+    if (!email) return res.status(400).json({ message: "Missing email query parameter" });
+
+    const query = { $or: [{ email }, { userEmail: email }] };
+    const myLoan = await allLoan.find(query).toArray();
+    res.json(myLoan);
+  } catch (error) {
+    console.error("Error fetching user loans:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
     //get loan by status pending
     app.get("/pending-loan", async (req, res) => {
       try {
@@ -189,19 +194,13 @@ app.get("/loan/:id", async (req, res) => {
   try {
     const { ObjectId } = require('mongodb');
     const id = req.params.id;
-    
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid loan ID" });
-    }
-    
+    if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid loan ID" });
+
     const query = { _id: new ObjectId(id) };
-    const loan = await loanCategory.findOne(query);
-    
-    if (!loan) {
-      return res.status(404).json({ message: "Loan not found" });
-    }
-    
-    res.send(loan);
+    const loan = await allLoan.findOne(query); // <-- changed to allLoan
+
+    if (!loan) return res.status(404).json({ message: "Loan not found" });
+    res.json(loan);
   } catch (error) {
     console.error("Error fetching loan:", error);
     res.status(500).json({ message: "Internal server error" });
