@@ -182,7 +182,7 @@ app.get("/my-loan", async (req, res) => {
     app.get("/pending-loan", async (req, res) => {
       try {
         const query = { status: "Pending" };
-        const pendingLoan = await allLoan.find(query).toArray();
+        const pendingLoan = await loanCategory.find(query).toArray();
         res.send(pendingLoan);
       } catch (error) {
         console.error("Error fetching pending loans:", error);
@@ -197,7 +197,7 @@ app.get("/loan/:id", async (req, res) => {
     if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid loan ID" });
 
     const query = { _id: new ObjectId(id) };
-    const loan = await allLoan.findOne(query); // <-- changed to allLoan
+    const loan = await loanCategory.findOne(query); // <-- changed to allLoan
 
     if (!loan) return res.status(404).json({ message: "Loan not found" });
     res.json(loan);
