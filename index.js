@@ -39,12 +39,32 @@ async function run() {
    app.post("/users", async (req, res) => {
     try {
       const user = req.body;
+          // Check if user with same email already exists
+    const existingUser = await usersCollection.findOne({ email: user.email });
+    if (existingUser) {
+      return res.status(409).json({ message: "User already exists with this email" });
+    }
       const result = await usersCollection.insertOne(user);
       res.send(result);
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   });
+
+// Get user by email
+app.get("/user-data", async (req, res) => {
+  try {
+    const email = req.query.email;
+    if (!email) return res.status(400).json({ message: "Missing email query parameter" });
+
+    const query = { $or: [{ email }, { userEmail: email }] };
+    const userData = await usersCollection.find(query).toArray();
+    res.json(userData);
+  } catch (error) {
+    console.error("Error fetching user loans:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
     
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
