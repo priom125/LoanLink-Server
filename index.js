@@ -51,6 +51,17 @@ async function run() {
     }
   });
 
+  //get all users
+  app.get("/all-users", async (req, res) => {
+    try {
+      const users = await usersCollection.find().toArray();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
 // Get user by email
 app.get("/user-data", async (req, res) => {
   try {
@@ -81,7 +92,7 @@ app.get("/user-data", async (req, res) => {
       }
     });
     // Add a new loan category by admin
-    app.post("dashboard/add-loan-category", async (req, res) => {
+    app.post("/dashboard/add-loan-category", async (req, res) => {
       try {
         const newLoanCategory = req.body;
         const result = await loanCategory.insertOne(newLoanCategory);
