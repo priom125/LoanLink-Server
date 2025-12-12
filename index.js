@@ -213,7 +213,7 @@ app.get("/my-loan", async (req, res) => {
     app.get("/pending-loan", async (req, res) => {
       try {
         const query = { status: "Pending" };
-        const pendingLoan = await loanCategory.find(query).toArray();
+        const pendingLoan = await allLoan.find(query).toArray();
         res.send(pendingLoan);
       } catch (error) {
         console.error("Error fetching pending loans:", error);
