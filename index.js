@@ -3,9 +3,8 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-require('dotenv').config();
+require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRECT);
-
 
 // 2. Initialize the Express application
 dotenv.config();
@@ -15,6 +14,32 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = 3000;
+
+const admin = require("firebase-admin");
+
+const serviceAccount = require("./loanlink-89b1f-firebase-adminsdk.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const verifyFBtoken = async (req, res, next) => {
+  const token = req.headers.authorization;
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  try {
+    const idToken = token.split(" ")[1];
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    console.log(decodedToken);
+ req.decoded_email = decodedToken.email;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+};
 
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -202,94 +227,89 @@ async function run() {
     });
 
     //payment related apis
-app.post("/create-checkout-session", async (req, res) => {
-  try {
-    const { cost, loanID } = req.body;
+    app.post("/create-checkout-session", async (req, res) => {
+      try {
+        const { cost, loanID } = req.body;
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Loan Application Fee",
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: "Loan Application Fee",
+                },
+                unit_amount: cost * 100, // $10 -> 1000 cents
+              },
+              quantity: 1,
             },
-            unit_amount: cost * 100, // $10 -> 1000 cents
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      // Metadata allows you to find this loan again after payment
-      metadata: { loanId: loanID }, 
-      success_url: `${process.env.SITE_DOMAIN}/dashboard/payments-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payments-cancel`,
+          ],
+          mode: "payment",
+          // Metadata allows you to find this loan again after payment
+          metadata: { loanId: loanID },
+          success_url: `${process.env.SITE_DOMAIN}/dashboard/payments-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payments-cancel`,
+        });
+
+        // Send the URL as JSON so React can redirect
+        res.json({ url: session.url });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    // Send the URL as JSON so React can redirect
-    res.json({ url: session.url });
-    
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ error: error.message });
-  }
-});
+    app.patch("/payments-success", async (req, res) => {
+      try {
+        const sessionId = req.query.session_id;
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
 
+        const transactionID = session.payment_intent;
 
-app.patch("/payments-success", async (req, res) => {
-  try {
-    const sessionId = req.query.session_id;
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const query = {
+          transactionID: transactionID,
+        };
 
+        const paymentExist = await Payments.findOne(query);
 
-    const transactionID = session.payment_intent;
+        if (paymentExist) {
+          return res.send({ message: "Already Exist", transactionID });
+        }
 
-    const query = {
-        transactionID:transactionID
-    }
+        if (session.payment_status === "paid") {
+          const id = session.metadata.loanId;
 
-    const paymentExist = await Payments.findOne(query);
+          const query = { _id: new ObjectId(id) };
+          const update = { $set: { paymentStatus: "Paid" } };
+          const result = await allLoan.updateOne(query, update);
 
-    if (paymentExist) {
-      return res.send({message:'Already Exist', transactionID})
-    }
-   
-    if (session.payment_status === 'paid') {
-      const id = session.metadata.loanId;
-      
-    
-      const query = { _id: new ObjectId(id) };
-      const update = { $set: { paymentStatus: 'Paid' } };
-      const result = await allLoan.updateOne(query, update);
+          const payment = {
+            amount: session.amount_total / 100,
+            customerEmail: session.customer_details.email,
+            loanID: id,
+            transactionID: session.payment_intent,
+            paymentStatus: session.payment_status,
+            paidAt: new Date(),
+          };
 
-    
-      const payment = {
-        amount: session.amount_total / 100, 
-        customerEmail: session.customer_details.email,
-        loanID: id,
-        transactionID: session.payment_intent,
-        paymentStatus: session.payment_status, 
-        paidAt: new Date()
-      };
+          const resultPayment = await Payments.insertOne(payment);
 
-     
-      const resultPayment = await Payments.insertOne(payment);
-
-      return res.send({
-        success: true, 
-        modifyLoan: result, 
-        paymentinfo: resultPayment
-      });
-    } else {
-      return res.status(400).send({ success: false, message: "Payment not verified" });
-    }
-  } catch (error) {
-    console.error("Database Error:", error);
-    res.status(500).send({ success: false, error: error.message });
-  }
-});
-
+          return res.send({
+            success: true,
+            modifyLoan: result,
+            paymentinfo: resultPayment,
+          });
+        } else {
+          return res
+            .status(400)
+            .send({ success: false, message: "Payment not verified" });
+        }
+      } catch (error) {
+        console.error("Database Error:", error);
+        res.status(500).send({ success: false, error: error.message });
+      }
+    });
 
     // loan category data change by admin
     app.patch("/update-loan-category/:id", async (req, res) => {
@@ -369,7 +389,7 @@ app.patch("/payments-success", async (req, res) => {
       }
     });
     // get payment hsitory by email (specific user)
-    app.get("/my-payments", async (req, res) => {
+    app.get("/my-payments", verifyFBtoken, async (req, res) => {
       try {
         const email = req.query.email;
         if (!email)
@@ -377,7 +397,15 @@ app.patch("/payments-success", async (req, res) => {
             .status(400)
             .json({ message: "Missing email query parameter" });
 
+            if (email!==req.decoded_email) {
+              return res
+            .status(403)
+            .json({ message: "Forbidden Access" });
+            }
+
         const query = { $or: [{ email }, { customerEmail: email }] };
+
+        // console.log('headers',req.headers)
         const myPayments = await Payments.find(query).toArray();
         res.json(myPayments);
       } catch (error) {
