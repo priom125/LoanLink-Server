@@ -23,6 +23,8 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
+
+
 const verifyFBtoken = async (req, res, next) => {
   const token = req.headers.authorization;
 
@@ -40,6 +42,40 @@ const verifyFBtoken = async (req, res, next) => {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
+
+// Admin middleware
+    const verifyAdmin = async(req,res,next) => {
+  const email = req.decoded_email;
+  const query = {email};
+  const user = usersCollection.findOne(query);
+
+  if (!user || user.role !== 'admin') {
+    return res.status(403).send({message: 'forbidden'})
+  }
+  next();
+}
+// Admin middleware
+    const verifyManager = async(req,res,next) => {
+  const email = req.decoded_email;
+  const query = {email};
+  const user = usersCollection.findOne(query);
+
+  if (!user || user.role !== 'manager') {
+    return res.status(403).send({message: 'forbidden'})
+  }
+  next();
+}
+// Admin middleware
+    const verifyBorrower = async(req,res,next) => {
+  const email = req.decoded_email;
+  const query = {email};
+  const user = usersCollection.findOne(query);
+
+  if (!user || user.role !== 'borrower') {
+    return res.status(403).send({message: 'forbidden'})
+  }
+  next();
+}
 
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -59,6 +95,8 @@ async function run() {
     const loanCategory = db.collection("Loan-Category");
     const usersCollection = db.collection("users");
     const Payments = db.collection("payments");
+
+
 
     // Add login user data in users collection
     app.post("/users", async (req, res) => {
