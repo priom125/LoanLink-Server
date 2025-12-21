@@ -138,6 +138,8 @@ async function run() {
             .status(400)
             .json({ message: "Missing email query parameter" });
 
+     
+
         const query = { $or: [{ email }, { userEmail: email }] };
         const userData = await usersCollection.find(query).toArray();
         res.json(userData);
@@ -209,6 +211,69 @@ async function run() {
         res.status(500).json({ message: error.message });
       }
     });
+    // Update user roleStatus by admin
+app.patch("/update-roleStatus/:id", async (req, res) => {
+  try {
+    const { ObjectId } = require("mongodb");
+    const id = req.params.id;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    const { roleStatus, suspendInfo } = req.body;
+
+    
+    if (!["Approved", "Suspended"].includes(roleStatus)) {
+      return res.status(400).json({
+        message: "Invalid roleStatus value",
+      });
+    }
+
+    const updateDoc = {
+      roleStatus,
+    };
+
+    // If Suspended → require reason & feedback
+    if (roleStatus === "Suspended") {
+      if (
+        !suspendInfo?.reason ||
+        !suspendInfo?.feedback
+      ) {
+        return res.status(400).json({
+          message: "Suspend reason and feedback are required",
+        });
+      }
+
+      updateDoc.suspendInfo = {
+        reason: suspendInfo.reason,
+        feedback: suspendInfo.feedback,
+        suspendedAt: new Date(),
+      };
+    }
+
+    // If Approved → clear suspension info
+    if (roleStatus === "Approved") {
+      updateDoc.suspendInfo = null;
+    }
+
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateDoc }
+    );
+
+    res.send({
+      success: true,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to update user roleStatus",
+      error: error.message,
+    });
+  }
+});
+
     // Update loan category by manager
     app.patch("/update-loan-category/:id", async (req, res) => {
       try {
@@ -484,13 +549,16 @@ async function run() {
 
     // Get loan categories by limit
     app.get("/loan-category", async (req, res) => {
-      try {
-        const categories = await loanCategory.find().limit(6).toArray();
-        res.json(categories) || [];
-      } catch (error) {
-        res.status(500).json({ message: error.message });
-      }
-    });
+  try {
+  
+    const categories = await loanCategory.find({ showOnHome: true }).limit(6).toArray();
+    
+    
+    res.json(categories || []);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
     // Get loan categories
     app.get("/all-loan-category", async (req, res) => {
       try {
