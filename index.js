@@ -135,7 +135,7 @@ async function run() {
     });
 
     // Get user by email
-    app.get("/user-data",  async (req, res) => {
+    app.get("/user-data",verifyFBtoken,async (req, res) => {
       try {
         const email = req.query.email;
         if (!email)
@@ -192,7 +192,7 @@ async function run() {
       }
     });
     // Add a new loan category by Manager
-    app.post("/dashboard/add-loan-category", async (req, res) => {
+    app.post("/dashboard/add-loan-category",verifyFBtoken,verifyManager, async (req, res) => {
       try {
         const newLoanCategory = req.body;
         const result = await loanCategory.insertOne(newLoanCategory);
@@ -372,7 +372,7 @@ app.patch("/update-roleStatus/:id",verifyFBtoken,verifyAdmin, async (req, res) =
       }
     });
 
-    app.patch("/payments-success", async (req, res) => {
+    app.patch("/payments-success",verifyFBtoken,verifyBorrower, async (req, res) => {
       try {
         const sessionId = req.query.session_id;
         const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -484,7 +484,7 @@ app.patch("/update-roleStatus/:id",verifyFBtoken,verifyAdmin, async (req, res) =
     });
 
     // get loan by email (specific user)
-    app.get("/my-loan",verifyFBtoken, async (req, res) => {
+    app.get("/my-loan", async (req, res) => {
       try {
         const email = req.query.email;
         if (!email)
