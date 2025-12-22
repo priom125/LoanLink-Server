@@ -12,3 +12,4 @@ out/
 node_modules/
 .env
 loanlink-89b1f-firebase-adminsdk.json
+.vercel
