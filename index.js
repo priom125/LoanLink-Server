@@ -43,39 +43,7 @@ const verifyFBtoken = async (req, res, next) => {
   }
 };
 
-// Admin middleware
-    const verifyAdmin = async(req,res,next) => {
-  const email = req.decoded_email;
-  const query = {email};
-  const user = usersCollection.findOne(query);
 
-  if (!user || user.role !== 'admin') {
-    return res.status(403).send({message: 'forbidden'})
-  }
-  next();
-}
-// Admin middleware
-    const verifyManager = async(req,res,next) => {
-  const email = req.decoded_email;
-  const query = {email};
-  const user = usersCollection.findOne(query);
-
-  if (!user || user.role !== 'manager') {
-    return res.status(403).send({message: 'forbidden'})
-  }
-  next();
-}
-// Admin middleware
-    const verifyBorrower = async(req,res,next) => {
-  const email = req.decoded_email;
-  const query = {email};
-  const user = usersCollection.findOne(query);
-
-  if (!user || user.role !== 'borrower') {
-    return res.status(403).send({message: 'forbidden'})
-  }
-  next();
-}
 
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -97,9 +65,46 @@ async function run() {
     const Payments = db.collection("payments");
 
 
+    // Admin middleware
+    const verifyAdmin = async(req,res,next) => {
+  const email = req.decoded_email;
+  const query = {email};
+  const user = await usersCollection.findOne(query);
+
+  if (!user || user.role !== 'admin') {
+    return res.status(403).send({message: 'forbidden'})
+  }
+  next();
+}
+
+
+    // Manager middleware
+    const verifyManager = async(req,res,next) => {
+  const email = req.decoded_email;
+  const query = {email};
+  const user = await usersCollection.findOne(query);
+
+  if (!user || user.role !== 'manager') {
+    return res.status(403).send({message: 'forbidden'})
+  }
+  next();
+}
+// Borrower middleware
+    const verifyBorrower = async(req,res,next) => {
+  const email = req.decoded_email;
+  const query = {email};
+  const user = await usersCollection.findOne(query);
+        console.log(user.role)
+  if (!user || user.role !== 'borrower') {
+    return res.status(403).send({message: 'forbidden'})
+  }
+  next();
+}
 
     // Add login user data in users collection
     app.post("/users", async (req, res) => {
+
+     
       try {
         const user = req.body;
         // Check if user with same email already exists
@@ -119,7 +124,7 @@ async function run() {
     });
 
     //get all users
-    app.get("/all-users", async (req, res) => {
+    app.get("/all-users", verifyFBtoken,verifyAdmin, async (req, res) => {
       try {
         const users = await usersCollection.find().toArray();
         res.json(users);
@@ -130,7 +135,7 @@ async function run() {
     });
 
     // Get user by email
-    app.get("/user-data", async (req, res) => {
+    app.get("/user-data",  async (req, res) => {
       try {
         const email = req.query.email;
         if (!email)
@@ -138,7 +143,11 @@ async function run() {
             .status(400)
             .json({ message: "Missing email query parameter" });
 
-     
+        if (email !== req.decoded_email) {
+            return res
+            .status(403)
+            .json({ message: "Unauthoried Access" });
+        }
 
         const query = { $or: [{ email }, { userEmail: email }] };
         const userData = await usersCollection.find(query).toArray();
@@ -150,7 +159,7 @@ async function run() {
     });
 
     //get user data by id
-    app.get("/user/:id", async (req, res) => {
+    app.get("/user/:id",verifyFBtoken,verifyAdmin, async (req, res) => {
       try {
         const { ObjectId } = require("mongodb");
         const id = req.params.id;
@@ -173,7 +182,7 @@ async function run() {
     );
 
     // Add a new loan by users or borrowers
-    app.post("/add-loan", async (req, res) => {
+    app.post("/add-loan",verifyFBtoken,verifyBorrower, async (req, res) => {
       try {
         const newLoan = req.body;
         const result = await allLoan.insertOne(newLoan);
@@ -182,7 +191,7 @@ async function run() {
         res.status(500).json({ message: error.message });
       }
     });
-    // Add a new loan category by admin
+    // Add a new loan category by Manager
     app.post("/dashboard/add-loan-category", async (req, res) => {
       try {
         const newLoanCategory = req.body;
@@ -192,8 +201,8 @@ async function run() {
         res.status(500).json({ message: error.message });
       }
     });
-    // Update loan category by admin
-    app.patch("/update-loan-category/:id", async (req, res) => {
+    // Update loan category by admin and manager
+    app.patch("/update-loan-category/:id",verifyFBtoken, async (req, res) => {
       try {
         const { ObjectId } = require("mongodb");
         const id = req.params.id;
@@ -212,7 +221,7 @@ async function run() {
       }
     });
     // Update user roleStatus by admin
-app.patch("/update-roleStatus/:id", async (req, res) => {
+app.patch("/update-roleStatus/:id",verifyFBtoken,verifyAdmin, async (req, res) => {
   try {
     const { ObjectId } = require("mongodb");
     const id = req.params.id;
@@ -275,7 +284,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
 });
 
     // Update loan category by manager
-    app.patch("/update-loan-category/:id", async (req, res) => {
+    app.patch("/update-loan-category/:id",verifyFBtoken, async (req, res) => {
       try {
         const { ObjectId } = require("mongodb");
         const id = req.params.id;
@@ -294,7 +303,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
       }
     });
     // Delete loan category by admin
-    app.delete("/delete-loan-category/:id", async (req, res) => {
+    app.delete("/delete-loan-category/:id",verifyFBtoken, async (req, res) => {
       try {
         const { ObjectId } = require("mongodb");
         const id = req.params.id;
@@ -310,7 +319,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
     });
 
     // Update loan status by manager
-    app.patch("/update-loan/:id", async (req, res) => {
+    app.patch("/update-loan/:id",verifyFBtoken, async (req, res) => {
       try {
         const { ObjectId } = require("mongodb");
         const id = req.params.id;
@@ -330,7 +339,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
     });
 
     //payment related apis
-    app.post("/create-checkout-session", async (req, res) => {
+    app.post("/create-checkout-session",verifyFBtoken,verifyBorrower, async (req, res) => {
       try {
         const { cost, loanID } = req.body;
 
@@ -415,7 +424,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
     });
 
     // loan category data change by admin
-    app.patch("/update-loan-category/:id", async (req, res) => {
+    app.patch("/update-loan-category/:id",verifyFBtoken, async (req, res) => {
       try {
         const { ObjectId } = require("mongodb");
         const id = req.params.id;
@@ -435,7 +444,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
     });
 
     //get all loans
-    app.get("/all-loan", async (req, res) => {
+    app.get("/all-loan",verifyFBtoken, async (req, res) => {
       try {
         const email = req.query.email;
         const filter = email ? { $or: [{ email }, { userEmail: email }] } : {};
@@ -448,7 +457,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
     });
 
     //get loans by status aproved
-    app.get("/approved-loan", async (req, res) => {
+    app.get("/approved-loan",verifyFBtoken,verifyManager, async (req, res) => {
       try {
         const query = { status: "Approved" };
         const approvedLoan = await allLoan.find(query).toArray();
@@ -459,7 +468,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
       }
     });
     //user cancel loan request
-    app.delete("/cancel-loan/:id", async (req, res) => {
+    app.delete("/cancel-loan/:id",verifyFBtoken,verifyBorrower, async (req, res) => {
       try {
         const { ObjectId } = require("mongodb");
         const id = req.params.id;
@@ -475,7 +484,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
     });
 
     // get loan by email (specific user)
-    app.get("/my-loan", async (req, res) => {
+    app.get("/my-loan",verifyFBtoken, async (req, res) => {
       try {
         const email = req.query.email;
         if (!email)
@@ -518,7 +527,7 @@ app.patch("/update-roleStatus/:id", async (req, res) => {
     });
 
     //get loan by status pending
-    app.get("/pending-loan", async (req, res) => {
+    app.get("/pending-loan",verifyFBtoken,verifyManager, async (req, res) => {
       try {
         const query = { status: "Pending" };
         const pendingLoan = await allLoan.find(query).toArray();
