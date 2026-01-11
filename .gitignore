@@ -1,0 +1,19 @@
+
+# Dependency directories
+node_modules/
+
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.env
+node_modules/
+.env
+loanlink-89b1f-firebase-adminsdk.json
+.vercel
+.env
+.env.local
+.env.*
+node_modules/
